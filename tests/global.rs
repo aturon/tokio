@@ -76,45 +76,49 @@ fn hammer_split() {
 
     let _ = env_logger::init();
 
-    let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
-    let addr = t!(srv.local_addr());
+    loop {
+        eprintln!("iter");
 
-    let mut rt = Runtime::new().unwrap();
+        let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
+        let addr = t!(srv.local_addr());
 
-    fn split(socket: TcpStream) {
-        let socket = Arc::new(socket);
-        let rd = Rd(socket.clone());
-        let wr = Wr(socket);
+        let mut rt = Runtime::new().unwrap();
 
-        let rd = io::read(rd, vec![0; 1])
-            .map(|_| ())
-            .map_err(|e| panic!("read error = {:?}", e));
+        fn split(socket: TcpStream) {
+            let socket = Arc::new(socket);
+            let rd = Rd(socket.clone());
+            let wr = Wr(socket);
 
-        let wr = io::write_all(wr, b"1")
-            .map(|_| ())
-            .map_err(|e| panic!("write error = {:?}", e));
+            let rd = io::read(rd, vec![0; 1])
+                .map(|_| ())
+                .map_err(|e| panic!("read error = {:?}", e));
 
-        tokio::spawn(rd);
-        tokio::spawn(wr);
-    }
+            let wr = io::write_all(wr, b"1")
+                .map(|_| ())
+                .map_err(|e| panic!("write error = {:?}", e));
 
-    rt.spawn({
-        srv.incoming()
-            .map_err(|e| panic!("accept error = {:?}", e))
-            .take(N as u64)
-            .for_each(|socket| {
-                split(socket);
-                Ok(())
-            })
-    });
+            tokio::spawn(rd);
+            tokio::spawn(wr);
+        }
 
-    for _ in 0..N {
         rt.spawn({
-            TcpStream::connect(&addr)
-                .map_err(|e| panic!("connect error = {:?}", e))
-                .map(|socket| split(socket))
+            srv.incoming()
+                .map_err(|e| panic!("accept error = {:?}", e))
+                .take(N as u64)
+                .for_each(|socket| {
+                    split(socket);
+                    Ok(())
+                })
         });
-    }
 
-    rt.shutdown_on_idle().wait().unwrap();
+        for _ in 0..N {
+            rt.spawn({
+                TcpStream::connect(&addr)
+                    .map_err(|e| panic!("connect error = {:?}", e))
+                    .map(|socket| split(socket))
+            });
+        }
+
+        rt.shutdown_on_idle().wait().unwrap();
+    }
 }

@@ -77,6 +77,7 @@ fn hammer_split() {
 
     let _ = env_logger::init();
 
+    loop {
     let srv = t!(TcpListener::bind(&"127.0.0.1:0".parse().unwrap()));
     let addr = t!(srv.local_addr());
 
@@ -119,4 +120,5 @@ fn hammer_split() {
     }
 
     futures::Future::wait(rt.shutdown_on_idle()).unwrap();
+    }
 }

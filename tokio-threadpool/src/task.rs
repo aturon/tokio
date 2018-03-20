@@ -1,3 +1,5 @@
+#![allow(unreachable_code)]
+
 use {Notifier, Sender};
 
 use futures::{self, future, Future, Async};
